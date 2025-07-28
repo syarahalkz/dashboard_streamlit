@@ -1,52 +1,60 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
 import joblib
-from sklearn.ensemble import RandomForestRegressor  # Bisa diganti jika pakai model lain
+from datetime import datetime
 
-# --- Load Model ---
-# Ganti dengan path model kamu jika sudah ada
-# model = joblib.load('model.pkl')
+# Load model
+model = joblib.load("model_inflasi.pkl")
 
-# Dummy model (ganti dengan model asli kamu)
-model = RandomForestRegressor()
-model.fit(np.random.rand(100, 7), np.random.rand(100))  # dummy training agar tidak error
+# ===== Header App =====
+st.title("📈 Prediksi Inflasi Total - Dashboard Forecasting")
 
-# --- Setup ---
-st.title("Prediksi Inflasi Indonesia")
+st.markdown("""
+Masukkan data ekonomi **bulan sebelumnya** untuk memprediksi **inflasi bulan berikutnya**.
+""")
 
-# --- Sidebar Inputs ---
-st.header("Input Parameter")
+# ===== Dropdown untuk memilih bulan dan tahun =====
+st.subheader("📆 Pilih Bulan & Tahun Prediksi")
 
-tahun = st.selectbox("Tahun", list(range(2020, 2031)))
-bulan = st.selectbox("Bulan", list(range(1, 13)))  # bulan sudah di-encode, cukup 1 bulan
+# List nama bulan
+bulan_dict = {
+    "Januari": 1, "Februari": 2, "Maret": 3, "April": 4,
+    "Mei": 5, "Juni": 6, "Juli": 7, "Agustus": 8,
+    "September": 9, "Oktober": 10, "November": 11, "Desember": 12
+}
 
-harga_beras = st.number_input("Harga Beras", min_value=0.0, format="%.2f")
-harga_bbm = st.number_input("Harga BBM", min_value=0.0, format="%.2f")
-bi_rate = st.number_input("BI Rate", min_value=0.0, format="%.2f")
-nilai_tukar = st.number_input("Nilai Tukar IDR/USD", min_value=0.0, format="%.2f")
-inflasi_inti = st.number_input("Inflasi Inti", min_value=0.0, format="%.2f")
+bulan_label = list(bulan_dict.keys())
+bulan_input = st.selectbox("Bulan Prediksi", bulan_label, index=datetime.now().month % 12)
+tahun_input = st.selectbox("Tahun Prediksi", list(range(2015, 2031)), index=2025-2015)
 
-# --- Validasi & Prediksi ---
-if st.button("Prediksi Inflasi"):
-    # Bentuk dataframe input
-    input_data = pd.DataFrame({
-        "Tahun": [tahun],
-        "Bulan": [bulan],
-        "Harga_Beras": [harga_beras],
-        "Harga_BBM": [harga_bbm],
-        "BI_Rate": [bi_rate],
-        "Nilai_Tukar": [nilai_tukar],
-        "Inflasi_Inti": [inflasi_inti]
-    })
+st.markdown(f"📝 Masukkan data ekonomi untuk **bulan sebelumnya** dari {bulan_input} {tahun_input}")
 
-    try:
-        prediksi = model.predict(input_data)[0]
-        st.subheader("Hasil Prediksi")
-        st.success(f"Prediksi Inflasi: {prediksi:.2f}%")
+# ===== Form Input =====
+with st.form("input_form"):
+    st.subheader("📊 Input Data Ekonomi (Bulan Sebelumnya)")
 
-        st.subheader("Data yang Dimasukkan")
-        st.table(input_data)
+    bi_rate = st.number_input("BI Rate (bulan sebelumnya)", value=5.75, format="%.2f")
+    bbm = st.number_input("Harga BBM (bulan sebelumnya)", value=10000.0, format="%.2f")
+    kurs = st.number_input("Kurs USD/IDR (bulan sebelumnya)", value=15000.0, format="%.2f")
+    beras = st.number_input("Harga Beras/kg (bulan sebelumnya)", value=12000.0, format="%.2f")
+    inflasi_inti = st.number_input("Inflasi Inti (bulan sebelumnya)", value=2.5, format="%.2f")
+    inflasi_total = st.number_input("Inflasi Total (bulan sebelumnya)", value=3.2, format="%.2f")
 
-    except Exception as e:
-        st.error(f"Terjadi kesalahan saat memproses prediksi: {e}")
+    submitted = st.form_submit_button("🎯 Prediksi")
+
+# ===== Prediksi =====
+if submitted:
+    # Buat DataFrame input
+    input_data = pd.DataFrame([{
+        'BI_Rate_lag1': bi_rate,
+        'BBM_lag1': bbm,
+        'Kurs_USD_IDR_lag1': kurs,
+        'Harga_Beras_lag1': beras,
+        'Inflasi_Inti_lag1': inflasi_inti,
+        'Inflasi_Total_lag1': inflasi_total
+    }])
+
+    # Prediksi
+    prediction = model.predict(input_data)[0]
+
+    st.success(f"📌 Prediksi Inflasi Total untuk **{bulan_input} {tahun_input}** adalah: **{prediction:.2f}%**")
